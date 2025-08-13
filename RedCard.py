@@ -12,6 +12,7 @@ import gc
 load_dotenv()
 
 token = os.getenv('DISCORD_TOKEN')
+guild = os.getenv('ID')
 EPHEMERAL = True # Set this false if u wanna debug easier
 BLACKLIST_FILE = 'blacklist.json'
 CONFIG_FILE = 'config.json'
@@ -28,7 +29,7 @@ try:
 except FileNotFoundError:
     config_file = []
 
-GUILD_ID = discord.Object(id=1366645415331627020)
+GUILD_ID = discord.Object(id=guild)
 PENDING_CHANNEL_ID = config_file[0]
 LOGS_CHANNEL_ID = config_file[1]
 MAX_FILE_SIZE = config_file[2]

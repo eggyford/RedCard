@@ -13,3 +13,4 @@ this will self populate. keep blank
 
 ## .env
 DISCORD_TOKEN = your_bot_token
+ID = guild_id
