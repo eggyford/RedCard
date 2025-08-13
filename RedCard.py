@@ -326,7 +326,11 @@ async def viewconfig(ctx: discord.Interaction):
     
     guild = ctx.guild
     try:
-        await ctx.response.send_message(f'Pending channel: {guild.get_channel(PENDING_CHANNEL_ID).jump_url}\nLog channel: {guild.get_channel(LOGS_CHANNEL_ID).jump_url}\nMax file size: {MAX_FILE_SIZE}MB', ephemeral=EPHEMERAL)
+        embed = discord.Embed()
+        embed.add_field(name='',
+                        value=f'Pending channel: {guild.get_channel(PENDING_CHANNEL_ID).jump_url}\nLog channel: {guild.get_channel(LOGS_CHANNEL_ID).jump_url}\nMax file size: {MAX_FILE_SIZE}MB',
+                        inline = False)
+        await ctx.response.send_message(embed=embed, ephemeral=EPHEMERAL)
     except Exception as e:
         await ctx.response.send_message(e, ephemeral=EPHEMERAL)
 
