@@ -27,6 +27,7 @@ try:
     with open(CONFIG_FILE, 'r') as f:
         config_file = json.load(f)
 except FileNotFoundError:
+    print('set up /config')
     config_file = []
 
 GUILD_ID = discord.Object(id=guild)
@@ -123,6 +124,11 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
     gc.collect()
 
     return
+
+@report.error
+async def report_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.CommandOnCooldown):
+            await interaction.response.send_message(str(error), ephemeral=EPHEMERAL)
 
     # -------------------------------- PENDING REPORTS --------------------------------
 
