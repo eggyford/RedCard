@@ -1,0 +1,5 @@
+.env
+blacklist.json
+discord.log
+config.json
+requirements.txt
