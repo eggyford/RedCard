@@ -28,11 +28,13 @@ try:
 except FileNotFoundError:
     config_file = []
 
-GUILD_ID = discord.Object(id=1204274732430524436)
+GUILD_ID = discord.Object(id=1366645415331627020)
 PENDING_CHANNEL_ID = config_file[0]
 LOGS_CHANNEL_ID = config_file[1]
 MAX_FILE_SIZE = config_file[2]
-print(f'{PENDING_CHANNEL_ID} {LOGS_CHANNEL_ID} {MAX_FILE_SIZE}')
+COMMAND_COOLDOWN = config_file[3]
+for config in config_file:
+    print(config)
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
@@ -52,7 +54,7 @@ bot = commands.Bot(command_prefix='$', intents=intents)
     link='Link video evidence.',
     attachment='Attach video evidence.'
 )
-# @app_commands.checks.cooldown(1, 60, key=lambda i: i.user.id)
+@app_commands.checks.cooldown(1, COMMAND_COOLDOWN, key=lambda i: i.user.id)
 async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None, attachment: Optional[discord.Attachment] = None):
     if ctx.user.id in blacklisted_users:
         await ctx.response.send_message('You have been blacklisted from making reports.', ephemeral=EPHEMERAL)
@@ -64,7 +66,7 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
     if attachment is not None:       
         attachmentSizeMB = attachment.size / 1024 / 1024
         if attachmentSizeMB >= MAX_FILE_SIZE:
-            await ctx.response.send_message(content=f'File size limit is {MAX_FILE_SIZE}MB.', ephemeral=EPHEMERAL)
+            await ctx.response.send_message(content=f'File size limit is {MAX_FILE_SIZE}MB.\nTry uploading to https://www.youtu.be and sending the link instead.', ephemeral=EPHEMERAL)
             
             del ctx, attachment
             gc.collect()
@@ -264,9 +266,10 @@ async def unblacklist(ctx:discord.Interaction, user: discord.Member):
 @app_commands.describe(
     pendingchannel='Set Pending Channel',
     logschannel='Set Logs Channel',
-    maxfilesize='Set Max File Size (MB)'
+    maxfilesize='Set Max File Size (MB)',
+    cooldown='Set Report Command Cooldown (Seconds)'
 )
-async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.TextChannel] = None, logschannel: Optional[discord.TextChannel] = None, maxfilesize: Optional[int] = None):
+async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.TextChannel] = None, logschannel: Optional[discord.TextChannel] = None, maxfilesize: Optional[int] = None, cooldown: Optional[int] = None):
     if not ctx.user.guild_permissions.administrator:
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
         
@@ -309,6 +312,18 @@ async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.Text
         except FileNotFoundError as e:
             print(f'Unfuck this bruh: {e}')
             return
+    
+    if cooldown is not None:
+        global COMMAND_COOLDOWN
+        COMMAND_COOLDOWN = cooldown
+
+        try:
+            with open(CONFIG_FILE, 'w') as f:
+                config_file[3] = cooldown
+                json.dump(config_file, f)
+        except FileNotFoundError as e:
+            print(f'Unfuck this bruh: {e}')
+            return
     await ctx.response.send_message('Configured.', ephemeral=EPHEMERAL)
 
     del ctx
@@ -328,7 +343,7 @@ async def viewconfig(ctx: discord.Interaction):
     try:
         embed = discord.Embed()
         embed.add_field(name='',
-                        value=f'Pending channel: {guild.get_channel(PENDING_CHANNEL_ID).jump_url}\nLog channel: {guild.get_channel(LOGS_CHANNEL_ID).jump_url}\nMax file size: {MAX_FILE_SIZE}MB',
+                        value=f'Pending channel: {guild.get_channel(PENDING_CHANNEL_ID).jump_url}\nLog channel: {guild.get_channel(LOGS_CHANNEL_ID).jump_url}\nMax file size: {MAX_FILE_SIZE}MB\nCooldown: {COMMAND_COOLDOWN} seconds',
                         inline = False)
         await ctx.response.send_message(embed=embed, ephemeral=EPHEMERAL)
     except Exception as e:
