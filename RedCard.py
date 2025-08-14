@@ -35,6 +35,7 @@ PENDING_CHANNEL_ID = config_file[0]
 LOGS_CHANNEL_ID = config_file[1]
 MAX_FILE_SIZE = config_file[2]
 COMMAND_COOLDOWN = config_file[3]
+COMMAND_RATE_LIMIT = config_file[4]
 for config in config_file:
     print(config)
 
@@ -55,7 +56,7 @@ bot = commands.Bot(command_prefix='$', intents=intents)
     link='Link video evidence.',
     attachment='Attach video evidence.'
 )
-@app_commands.checks.cooldown(1, COMMAND_COOLDOWN, key=lambda i: i.user.id)
+@app_commands.checks.cooldown(COMMAND_RATE_LIMIT, COMMAND_COOLDOWN, key=lambda i: i.user.id)
 async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None, attachment: Optional[discord.Attachment] = None):
     if ctx.user.id in blacklisted_users:
         await ctx.response.send_message('You have been blacklisted from making reports.', ephemeral=EPHEMERAL)
@@ -291,9 +292,10 @@ async def unblacklist(ctx:discord.Interaction, user: discord.Member):
     pendingchannel='Set Pending Channel',
     logschannel='Set Logs Channel',
     maxfilesize='Set Max File Size (MB)',
-    cooldown='Set Report Command Cooldown (Seconds)'
+    cooldown='Set Report Command Cooldown (Seconds)',
+    ratelimit='Set how many reports can be sent before cooldown'
 )
-async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.TextChannel] = None, logschannel: Optional[discord.TextChannel] = None, maxfilesize: Optional[int] = None, cooldown: Optional[int] = None):
+async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.TextChannel] = None, logschannel: Optional[discord.TextChannel] = None, maxfilesize: Optional[int] = None, cooldown: Optional[int] = None, ratelimit: Optional[int] = None):
     if not ctx.user.guild_permissions.administrator:
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
         
@@ -348,6 +350,18 @@ async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.Text
         except FileNotFoundError as e:
             print(f'Unfuck this bruh: {e}')
             return
+        
+    if ratelimit is not None:
+        global COMMAND_RATE_LIMIT
+        COMMAND_RATE_LIMIT = ratelimit
+
+        try:
+            with open(CONFIG_FILE, 'w') as f:
+                config_file[4] = ratelimit
+                json.dump(config_file, f)
+        except FileNotFoundError as e:
+            print(f'Unfuck this bruh: {e}')
+            return
     await ctx.response.send_message('Configured.', ephemeral=EPHEMERAL)
 
     del ctx
@@ -367,7 +381,7 @@ async def viewconfig(ctx: discord.Interaction):
     try:
         embed = discord.Embed()
         embed.add_field(name='',
-                        value=f'Pending channel: {guild.get_channel(PENDING_CHANNEL_ID).jump_url}\nLog channel: {guild.get_channel(LOGS_CHANNEL_ID).jump_url}\nMax file size: {MAX_FILE_SIZE}MB\nCooldown: {COMMAND_COOLDOWN} seconds',
+                        value=f'Pending channel: {guild.get_channel(PENDING_CHANNEL_ID).jump_url}\nLog channel: {guild.get_channel(LOGS_CHANNEL_ID).jump_url}\nMax file size: {MAX_FILE_SIZE}MB\nCooldown: {COMMAND_COOLDOWN} seconds\nRate Limit: {COMMAND_RATE_LIMIT}',
                         inline = False)
         await ctx.response.send_message(embed=embed, ephemeral=EPHEMERAL)
     except Exception as e:
