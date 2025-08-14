@@ -125,9 +125,11 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
     return
 
 @report.error
-async def report_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(str(error), ephemeral=EPHEMERAL)
+async def report_error(ctx: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await ctx.response.send_message(str(error), ephemeral=EPHEMERAL)
+    del ctx, error
+    gc.collect()
 
     # -------------------------------- PENDING REPORTS --------------------------------
 
