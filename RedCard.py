@@ -91,7 +91,6 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
     
     thumbnails = ['https://media.discordapp.net/attachments/1366645416430669857/1402167998910824481/caption.gif?ex=689985b5&is=68983435&hm=936e14918616642fbbcf88828b88f1c9740339fea0bca121a9dc274ba9d39f2c&=&width=750&height=750',
                   'https://media.discordapp.net/attachments/1356789044113051819/1403655176606191636/attachment.png?ex=68990000&is=6897ae80&hm=d2ac218c58e7f0b1839b17155b29e38de00be507ac517d4a80a5b66dba33384b&=&format=webp&quality=lossless&width=750&height=750',
-                  'https://media.discordapp.net/attachments/1356789044113051819/1403993433898483793/attachment.png?ex=68999247&is=689840c7&hm=143b856a64dbbcfecf54c0b5e30c6d797992784f30a7179f4a48e95f69fb29a0&=&format=webp&quality=lossless&width=750&height=750',
                   'https://media.discordapp.net/attachments/1356789044113051819/1403994323426611280/attachment.png?ex=6899931b&is=6898419b&hm=523edb3b37ac91b08971ffc2661f194ee475548769055e3a1a24bc8cfe4fe4b4&=&format=webp&quality=lossless&width=750&height=750',
                   'https://media.discordapp.net/attachments/1356789044113051819/1403995864866754590/attachment.png?ex=6899948b&is=6898430b&hm=e774536589bb88e48f317e97b5676c77d06f21b0092b2e0cca63445c40a17fd7&=&format=webp&quality=lossless&width=750&height=750']
     
