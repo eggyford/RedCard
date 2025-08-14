@@ -43,7 +43,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-
 bot = commands.Bot(command_prefix='$', intents=intents)
 
 # -------------------------------- BOT FUNCTION -------------------------------
@@ -65,7 +64,7 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
         gc.collect()
         return
         
-    if attachment is not None:       
+    if attachment is not None:
         attachmentSizeMB = attachment.size / 1024 / 1024
         if attachmentSizeMB >= MAX_FILE_SIZE:
             await ctx.response.send_message(content=f'File size limit is {MAX_FILE_SIZE}MB.\nTry uploading to https://www.youtu.be and sending the link instead.', ephemeral=EPHEMERAL)
@@ -137,6 +136,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     react = ctx.emoji.name
     channel = bot.get_channel(ctx.channel_id)
     message = await channel.fetch_message(ctx.message_id)
+    member = await bot.fetch_user(message.embeds[0].footer.text)
 
     if ctx.channel_id != PENDING_CHANNEL_ID:
         return
@@ -160,11 +160,17 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
                               inline=False)
         embedToSend.set_footer(text=message.embeds[0].footer.text,
                                icon_url=message.embeds[0].footer.icon_url)
+        
+        dmEmbed = discord.Embed(color=0x44ff44)
+        dmEmbed.add_field(name='',
+                          value=f'Your report on {message.embeds[0].title[17:]} was accepted.',
+                          inline=False)
 
         if len(message.attachments) != 0:
             await logsChannel.send(embed=embedToSend, file=await message.attachments[0].to_file())
         else:
             await logsChannel.send(embed=embedToSend)
+        await member.send(embed=dmEmbed)
 
         await message.delete()
 
@@ -192,7 +198,6 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     if react == '🛃':
         logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
         user = await bot.fetch_user(message.embeds[0].footer.text)
-        # userID = int(message.embeds[0].footer.text)
         moderator = await bot.fetch_user(ctx.user_id)
         
         if user.id not in blacklisted_users:
@@ -209,8 +214,14 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
                               inline=False)
         embedToSend.set_footer(text=message.embeds[0].footer.text,
                                icon_url=message.embeds[0].footer.icon_url)
+        
+        dmEmbed = discord.Embed(color=0x3abade)
+        dmEmbed.add_field(name='',
+                          value=f'You have been blacklisted from making reports.',
+                          inline=False)
 
         await logsChannel.send(embed=embedToSend)
+        await member.send(embed=dmEmbed)
         await message.delete()
 
     del embedToSend, message, ctx, channel, react
