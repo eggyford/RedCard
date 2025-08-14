@@ -187,11 +187,17 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
                               inline=False)
         embedToSend.set_footer(text=message.embeds[0].footer.text,
                                icon_url=message.embeds[0].footer.icon_url)
+        
+        dmEmbed = discord.Embed(color=0xff4444)
+        dmEmbed.add_field(name='',
+                          value=f'Your report on {message.embeds[0].title[17:]} was declined.',
+                          inline=False)
 
         if len(message.attachments) != 0:
             await logsChannel.send(embed=embedToSend, file=await message.attachments[0].to_file())
         else:
             await logsChannel.send(embed=embedToSend)
+        await member.send(embed=dmEmbed)
 
         await message.delete()
     
