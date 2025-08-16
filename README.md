@@ -1,9 +1,9 @@
 # Brief Bullshit
 
 ## config.json
-[pendingReportsChannelID, reportLogsChannelID, maxFileUploadSizeMBs] 
+[pendingReportsChannelID, reportLogsChannelID, maxFileUploadSizeMBs, cooldownTimeSeconds, rateLimit] 
 
-eg [1403603041319387216, 1403603078027935855, 8]
+eg [1403603041319387216, 1403603078027935855, 8, 60, 1]
 
 ## blacklist.json
 this will self populate. keep blank

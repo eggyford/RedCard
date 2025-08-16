@@ -139,6 +139,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     channel = bot.get_channel(ctx.channel_id)
     message = await channel.fetch_message(ctx.message_id)
     member = await bot.fetch_user(message.embeds[0].footer.text)
+    guild = bot.get_guild(GUILD_ID)
 
     if ctx.channel_id != PENDING_CHANNEL_ID:
         return
@@ -172,7 +173,11 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
             await logsChannel.send(embed=embedToSend, file=await message.attachments[0].to_file())
         else:
             await logsChannel.send(embed=embedToSend)
-        await member.send(embed=dmEmbed)
+            
+        try:
+            await member.send(embed=dmEmbed)
+        except Exception as e:
+            print(e)
 
         await message.delete()
 
@@ -199,7 +204,11 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
             await logsChannel.send(embed=embedToSend, file=await message.attachments[0].to_file())
         else:
             await logsChannel.send(embed=embedToSend)
-        await member.send(embed=dmEmbed)
+
+        try:
+            await member.send(embed=dmEmbed)
+        except Exception as e:
+            print(e)
 
         await message.delete()
     
@@ -229,10 +238,14 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
                           inline=False)
 
         await logsChannel.send(embed=embedToSend)
-        await member.send(embed=dmEmbed)
+
+        try:
+            await member.send(embed=dmEmbed)
+        except Exception as e:
+            print(e)
         await message.delete()
 
-    del embedToSend, message, ctx, channel, react
+    del embedToSend, message, ctx, channel, react, guild
     gc.collect()
     return
 
