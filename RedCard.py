@@ -415,6 +415,7 @@ async def on_ready():
         guild = GUILD_ID
         synced = await bot.tree.sync(guild=guild)
         print(f'synced {len(synced)} commands to {guild.id}')
+        await bot.change_presence(activity=discord.Game(name='/report'))
 
     except Exception as e:
         print(f'Shit broke: {e}')
