@@ -17,13 +17,13 @@ EPHEMERAL = True # Set this false if u wanna debug easier
 BLACKLIST_FILE = 'blacklist.json'
 CONFIG_FILE = 'config.json'
 
-try:
+try: # load blacklisted users from json
     with open(BLACKLIST_FILE, 'r') as f:
         blacklisted_users = json.load(f)
 except FileNotFoundError:
     blacklisted_users = []
 
-try: 
+try: # load server config from json
     with open(CONFIG_FILE, 'r') as f:
         config_file = json.load(f)
 except FileNotFoundError:
@@ -31,7 +31,7 @@ except FileNotFoundError:
     config_file = []
 
 GUILD_ID = discord.Object(id=guild)
-PENDING_CHANNEL_ID = config_file[0]
+PENDING_CHANNEL_ID = config_file[0] # loading configs
 LOGS_CHANNEL_ID = config_file[1]
 MAX_FILE_SIZE = config_file[2]
 COMMAND_COOLDOWN = config_file[3]
@@ -58,7 +58,7 @@ bot = commands.Bot(command_prefix='$', intents=intents)
 )
 @app_commands.checks.cooldown(COMMAND_RATE_LIMIT, COMMAND_COOLDOWN, key=lambda i: i.user.id)
 async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None, attachment: Optional[discord.Attachment] = None):
-    if ctx.user.id in blacklisted_users:
+    if ctx.user.id in blacklisted_users: # stop if user blacklisted
         await ctx.response.send_message('You have been blacklisted from making reports.', ephemeral=EPHEMERAL)
         
         del ctx
@@ -67,7 +67,7 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
         
     if attachment is not None:
         attachmentSizeMB = attachment.size / 1024 / 1024
-        if attachmentSizeMB >= MAX_FILE_SIZE:
+        if attachmentSizeMB >= MAX_FILE_SIZE: # stop if uploaded file bigger than upload limit
             await ctx.response.send_message(content=f'File size limit is {MAX_FILE_SIZE}MB.\nTry uploading to https://www.youtu.be and sending the link instead.', ephemeral=EPHEMERAL)
             
             del ctx, attachment
@@ -77,14 +77,14 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
     guild = ctx.guild
     pendingChannel = guild.get_channel(PENDING_CHANNEL_ID)
 
-    if link is None and attachment is None:
+    if link is None and attachment is None: # stop if no evidence included in report
         await ctx.response.send_message('Please provide evidence for your report.', ephemeral=EPHEMERAL)
         
         del ctx
         gc.collect()
         return
     
-    await ctx.response.send_message('Processing your report...', ephemeral=EPHEMERAL)
+    await ctx.response.send_message('Processing your report...', ephemeral=EPHEMERAL) # report submitted
     
     embed = discord.Embed(title=f'Player Reported: {name}', 
                           color=0xff8080)
@@ -94,9 +94,9 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
                   'https://media.discordapp.net/attachments/1356789044113051819/1403994323426611280/attachment.png?ex=6899931b&is=6898419b&hm=523edb3b37ac91b08971ffc2661f194ee475548769055e3a1a24bc8cfe4fe4b4&=&format=webp&quality=lossless&width=750&height=750',
                   'https://media.discordapp.net/attachments/1356789044113051819/1403995864866754590/attachment.png?ex=6899948b&is=6898430b&hm=e774536589bb88e48f317e97b5676c77d06f21b0092b2e0cca63445c40a17fd7&=&format=webp&quality=lossless&width=750&height=750']
     
-    embed.set_thumbnail(url=thumbnails[random.randint(0,len(thumbnails)-1)])
+    embed.set_thumbnail(url=thumbnails[random.randint(0,len(thumbnails)-1)]) # grab a random thumbnail from the list to put in embed
 
-    if link is not None:
+    if link is not None: # add a field, depends on if user submitted a link
         embed.add_field(name='',
                         value=f'❯ Reported by: {ctx.user.mention}\n❯ {link}',
                         inline=False)
@@ -105,21 +105,21 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
                         value=f'❯ Reported by: {ctx.user.mention}',
                         inline=False)
     
-    embed.set_footer(text=f'{ctx.user.id}',
+    embed.set_footer(text=f'{ctx.user.id}', # redcard png as the footer icon
                     icon_url="https://cdn-icons-png.flaticon.com/32/5524/5524644.png")
 
-    reacts = ['✅', '❌', '🛃']
     if attachment is not None:
-        pendingReport = await pendingChannel.send(embed=embed, file=await attachment.to_file())
+        pendingReport = await pendingChannel.send(embed=embed, file=await attachment.to_file()) # send report to pending channel, depends on if file attached
     else:
         pendingReport = await pendingChannel.send(embed=embed)
     
+    reacts = ['✅', '❌', '🛃'] # pending report reactions: accept, deny, blacklist
     for react in reacts:
         await pendingReport.add_reaction(react)
 
-    await ctx.followup.send(content='Report sent.', ephemeral=EPHEMERAL)
+    await ctx.followup.send(content='Report sent.', ephemeral=EPHEMERAL) # notify user report sent
 
-    del ctx, name, link, attachment, embed, pendingReport, thumbnails, reacts
+    del ctx, name, link, attachment, embed, pendingReport, thumbnails, reacts # free up memory
     gc.collect()
 
     return
@@ -127,7 +127,7 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
 @report.error
 async def report_error(ctx: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.CommandOnCooldown):
-        await ctx.response.send_message(str(error), ephemeral=EPHEMERAL)
+        await ctx.response.send_message(str(error), ephemeral=EPHEMERAL) # tell user they are on cooldown
     del ctx, error
     gc.collect()
 
@@ -135,11 +135,9 @@ async def report_error(ctx: discord.Interaction, error: app_commands.AppCommandE
 
 @bot.event
 async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
-    react = ctx.emoji.name
-    channel = bot.get_channel(ctx.channel_id)
-    message = await channel.fetch_message(ctx.message_id)
-    member = await bot.fetch_user(message.embeds[0].footer.text)
-    guild = bot.get_guild(GUILD_ID)
+    react = ctx.emoji.name # reaction that was pressed
+    channel = bot.get_channel(ctx.channel_id) # channel message reacted in (this fires for ALL reactions. needed for filter)
+    message = await channel.fetch_message(ctx.message_id) # message reacted to
 
     if ctx.channel_id != PENDING_CHANNEL_ID:
         return
@@ -149,8 +147,10 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
 
     if message.author.id != bot.user.id:
         return
+    
+    member = await bot.fetch_user(message.embeds[0].footer.text) # gets user who made report from footer of embed 
 
-    if react == '✅':
+    if react == '✅': # accept report
         logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
         moderator = await bot.fetch_user(ctx.user_id)
 
@@ -181,7 +181,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
 
         await message.delete()
 
-    if react == '❌':        
+    if react == '❌': # deny report
         logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
         moderator = await bot.fetch_user(ctx.user_id)
 
@@ -212,7 +212,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
 
         await message.delete()
     
-    if react == '🛃':
+    if react == '🛃': # blacklist user from making reports
         logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
         user = await bot.fetch_user(message.embeds[0].footer.text)
         moderator = await bot.fetch_user(ctx.user_id)
@@ -245,7 +245,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
             print(e)
         await message.delete()
 
-    del embedToSend, message, ctx, channel, react, guild
+    del embedToSend, message, ctx, channel, react
     gc.collect()
     return
 
