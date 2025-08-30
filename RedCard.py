@@ -50,7 +50,7 @@ bot = commands.Bot(command_prefix='$', intents=intents)
 
     # -------------------------------- REPORT --------------------------------
 
-@bot.tree.command(name='report', description='report someone', guild=GUILD_ID)
+@bot.tree.command(name='report', description='Report someone', guild=GUILD_ID)
 @app_commands.describe(
     name='Roblox username.',
     link='Link video evidence.',
@@ -76,6 +76,7 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
 
     guild = ctx.guild
     pendingChannel = guild.get_channel(PENDING_CHANNEL_ID)
+    rolePing = discord.utils.get(ctx.guild.roles, name='reportPings')
 
     if link is None and attachment is None: # stop if no evidence included in report
         await ctx.response.send_message('Please provide evidence for your report.', ephemeral=EPHEMERAL)
@@ -112,6 +113,7 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
         pendingReport = await pendingChannel.send(embed=embed, file=await attachment.to_file()) # send report to pending channel, depends on if file attached
     else:
         pendingReport = await pendingChannel.send(embed=embed)
+    await pendingChannel.send(f'<@&{rolePing.id}>')
     
     reacts = ['✅', '❌', '🛃'] # pending report reactions: accept, deny, blacklist
     for react in reacts:
@@ -403,6 +405,27 @@ async def viewconfig(ctx: discord.Interaction):
 
     del ctx
     gc.collect()
+    return
+
+@bot.tree.command(name='active', description='Toggle report pings', guild=GUILD_ID)
+async def active(ctx: discord.Interaction):
+    if not ctx.user.guild_permissions.kick_members:
+        await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
+        return
+
+    role = discord.utils.get(ctx.guild.roles, name='reportPings')
+
+    if not role:
+        await ctx.response.send_message('reportPings role doesnt exist', ephemeral=EPHEMERAL)
+        return
+    
+    if role in ctx.user.roles:
+        await ctx.user.remove_roles(role)
+        await ctx.response.send_message('Marked offline.', ephemeral=EPHEMERAL)
+    else:
+        await ctx.user.add_roles(role)
+        await ctx.response.send_message('Marked online.', ephemeral=EPHEMERAL)
+
     return
 
 # --------------------------------- BOT SETUP ---------------------------------
