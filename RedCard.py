@@ -110,10 +110,9 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
                     icon_url="https://cdn-icons-png.flaticon.com/32/5524/5524644.png")
 
     if attachment is not None:
-        pendingReport = await pendingChannel.send(embed=embed, file=await attachment.to_file()) # send report to pending channel, depends on if file attached
+        pendingReport = await pendingChannel.send(f'<@&{rolePing.id}>', embed=embed, file=await attachment.to_file()) # send report to pending channel, depends on if file attached
     else:
-        pendingReport = await pendingChannel.send(embed=embed)
-    await pendingChannel.send(f'<@&{rolePing.id}>')
+        pendingReport = await pendingChannel.send(f'<@&{rolePing.id}>', embed=embed)
     
     reacts = ['✅', '❌', '🛃'] # pending report reactions: accept, deny, blacklist
     for react in reacts:
@@ -406,6 +405,8 @@ async def viewconfig(ctx: discord.Interaction):
     del ctx
     gc.collect()
     return
+
+# --------------------------------- STAFF PINGS ---------------------------------
 
 @bot.tree.command(name='active', description='Toggle report pings', guild=GUILD_ID)
 async def active(ctx: discord.Interaction):
