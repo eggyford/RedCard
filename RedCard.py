@@ -16,6 +16,7 @@ guild = os.getenv('ID')
 EPHEMERAL = True # Set this false if u wanna debug easier
 BLACKLIST_FILE = 'blacklist.json'
 CONFIG_FILE = 'config.json'
+MODLOGS_FILE = 'modlogs.json'
 
 try: # load blacklisted users from json
     with open(BLACKLIST_FILE, 'r') as f:
@@ -29,6 +30,12 @@ try: # load server config from json
 except FileNotFoundError:
     print('set up /config')
     config_file = []
+
+try:
+    with open(MODLOGS_FILE, 'r') as f:
+        modlogs_file = json.load(f)
+except FileNotFoundError:
+    modlogs_file = dict()
 
 GUILD_ID = discord.Object(id=guild)
 PENDING_CHANNEL_ID = config_file[0] # loading configs
@@ -246,6 +253,17 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
             print(e)
         await message.delete()
 
+    if str(ctx.member.id) not in modlogs_file:
+        modlogs_file[str(ctx.member.id)] = 1
+    else:
+        modlogs_file.update({str(ctx.member.id): modlogs_file.get(str(ctx.member.id)) + 1})
+
+    try:
+        with open(MODLOGS_FILE, 'w') as f:
+            json.dump(modlogs_file, f, indent=4)
+    except Exception as e:
+        print(e)
+    
     del embedToSend, message, ctx, channel, react
     gc.collect()
     return
@@ -427,6 +445,56 @@ async def active(ctx: discord.Interaction):
         await ctx.user.add_roles(role)
         await ctx.response.send_message('Marked online.', ephemeral=EPHEMERAL)
 
+    return
+
+# --------------------------------- MOD LOGS ---------------------------------
+
+@bot.tree.command(name='modlogs', description='Get completed reports of staff', guild=GUILD_ID)
+@app_commands.describe(
+    staff='staff id'
+)
+async def modlogs(ctx: discord.Interaction, staff: Optional[discord.Member] = None):
+    if staff is None:
+        staff = ctx.user
+
+    if str(staff.id) in modlogs_file:
+        await ctx.response.send_message(f'{staff} has {modlogs_file.get(str(staff.id))} modlogs', ephemeral=EPHEMERAL)
+    else:
+        await ctx.response.send_message(f'{staff} has no modlogs', ephemeral=EPHEMERAL)
+
+    return
+
+
+@bot.tree.command(name='setmodlogs', description='Get completed reports of staff', guild=GUILD_ID)
+@app_commands.describe(
+    staff='staff id',
+    numlogs='number of logs'
+)
+async def setmodlogs(ctx: discord.Interaction, staff: discord.Member, numlogs: int):
+    modlogs_file.update({str(staff.id): numlogs})
+
+    await ctx.response.send_message(f'{staff} modlogs set to {numlogs}', ephemeral=EPHEMERAL)
+
+    try:
+        with open(MODLOGS_FILE, 'w') as f:
+            json.dump(modlogs_file, f, indent=4)
+    except Exception as e:
+        print(e)
+
+    return
+
+@bot.tree.command(name='listmodlogs', description='List all user modlogs in descending order', guild=GUILD_ID)
+async def listmodlogs(ctx: discord.Interaction):
+    sortedModlogs = sorted(modlogs_file.items(), key=lambda item: item[1], reverse=True)
+    
+    modlogsString = ''.join(f"<@{k}>: {v}\n" for k, v in sortedModlogs)
+    embed = discord.Embed()
+    embed.add_field(name='Modlogs list',
+                    value=modlogsString,
+                    inline=False)
+    
+    await ctx.response.send_message(embed=embed)
+    
     return
 
 # --------------------------------- BOT SETUP ---------------------------------
