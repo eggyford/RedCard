@@ -447,33 +447,33 @@ async def active(ctx: discord.Interaction):
 
     return
 
-# --------------------------------- MOD LOGS ---------------------------------
+# --------------------------------- MOD STATS ---------------------------------
 
-@bot.tree.command(name='modlogs', description='Get completed reports of staff', guild=GUILD_ID)
+@bot.tree.command(name='modstats', description='Get completed reports of staff', guild=GUILD_ID)
 @app_commands.describe(
     staff='staff id'
 )
-async def modlogs(ctx: discord.Interaction, staff: Optional[discord.Member] = None):
+async def modstats(ctx: discord.Interaction, staff: Optional[discord.Member] = None):
     if staff is None:
         staff = ctx.user
 
     if str(staff.id) in modlogs_file:
-        await ctx.response.send_message(f'{staff} has {modlogs_file.get(str(staff.id))} modlogs', ephemeral=EPHEMERAL)
+        await ctx.response.send_message(f'{staff} has {modlogs_file.get(str(staff.id))} moderations', ephemeral=EPHEMERAL)
     else:
-        await ctx.response.send_message(f'{staff} has no modlogs', ephemeral=EPHEMERAL)
+        await ctx.response.send_message(f'{staff} has no moderations', ephemeral=EPHEMERAL)
 
     return
 
 
-@bot.tree.command(name='setmodlogs', description='Get completed reports of staff', guild=GUILD_ID)
+@bot.tree.command(name='setmodstats', description='Set completed reports of staff', guild=GUILD_ID)
 @app_commands.describe(
     staff='staff id',
     numlogs='number of logs'
 )
-async def setmodlogs(ctx: discord.Interaction, staff: discord.Member, numlogs: int):
+async def setmodstats(ctx: discord.Interaction, staff: discord.Member, numlogs: int):
     modlogs_file.update({str(staff.id): numlogs})
 
-    await ctx.response.send_message(f'{staff} modlogs set to {numlogs}', ephemeral=EPHEMERAL)
+    await ctx.response.send_message(f'{staff} modstats set to {numlogs}', ephemeral=EPHEMERAL)
 
     try:
         with open(MODLOGS_FILE, 'w') as f:
@@ -483,18 +483,75 @@ async def setmodlogs(ctx: discord.Interaction, staff: discord.Member, numlogs: i
 
     return
 
-@bot.tree.command(name='listmodlogs', description='List all user modlogs in descending order', guild=GUILD_ID)
-async def listmodlogs(ctx: discord.Interaction):
+@bot.tree.command(name='listmodstats', description='List all user modstats in descending order', guild=GUILD_ID)
+async def listmodstats(ctx: discord.Interaction):
     sortedModlogs = sorted(modlogs_file.items(), key=lambda item: item[1], reverse=True)
     
     modlogsString = ''.join(f"<@{k}>: {v}\n" for k, v in sortedModlogs)
     embed = discord.Embed()
-    embed.add_field(name='Modlogs list',
+    embed.add_field(name='Modstats list',
                     value=modlogsString,
                     inline=False)
     
     await ctx.response.send_message(embed=embed)
     
+    return
+
+# --------------------------------- OVERWRITE ---------------------------------
+
+@bot.tree.command(name='overwrite', description='Overwrite a report', guild=GUILD_ID)
+@app_commands.describe(
+    reportid='message ID'
+)
+async def overwrite(ctx: discord.Interaction, reportid: str):
+    try:
+        reportidAsInt = int(reportid)
+        channel = bot.get_channel(LOGS_CHANNEL_ID)
+        message = await channel.fetch_message(reportidAsInt)
+
+        if message.author.id != bot.user.id:
+            await ctx.response.send_message('Nice try idiot', ephemeral=EPHEMERAL)
+            return
+
+        embed = message.embeds[0]
+
+        newEmbed = discord.Embed()
+        newEmbed.set_thumbnail(url=embed.thumbnail.url)
+        newEmbed.set_footer(text=embed.footer.text)
+
+
+        if embed.color.value == 0xff4444:
+            newEmbed.color = 0x44ff44
+            newEmbed.title = embed.title.replace('Denied', 'Accepted', 1)
+            newEmbed.add_field(name='',
+                               value=embed.fields[0].value + f'\n❯ Overwritten by: {ctx.user.mention}',
+                               inline=False)
+        
+        elif embed.color.value == 0x44ff44:
+            newEmbed.color = 0xff4444
+            newEmbed.title = embed.title.replace('Accepted', 'Denied', 1)
+            newEmbed.add_field(name='',
+                               value=embed.fields[0].value + f'\n❯ Overwritten by: {ctx.user.mention}',
+                               inline=False)
+            
+        elif embed.color.value == 0x3abade:
+            await ctx.response.send_message(f'Do /unblacklist. I\'m not coding this shit.', ephemeral=EPHEMERAL)
+            return
+        
+        else:
+            await ctx.response.send_message(f'Uhh something broke screenshot this and send to FreakyFentFold. \n{reportid}')
+            return
+
+        await ctx.response.send_message(embed=newEmbed)
+        await message.delete()
+
+    except discord.errors.NotFound:
+        await ctx.response.send_message(f'Report not found', ephemeral=EPHEMERAL)
+    except Exception as e:
+        await ctx.response.send_message(e, ephemeral=EPHEMERAL)
+        print(e)
+
+    await ctx.response.send_message(f'{reportid} overwritten.')
     return
 
 # --------------------------------- BOT SETUP ---------------------------------
