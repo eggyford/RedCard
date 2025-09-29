@@ -16,7 +16,7 @@ guild = os.getenv('ID')
 EPHEMERAL = True # Set this false if u wanna debug easier
 BLACKLIST_FILE = 'blacklist.json'
 CONFIG_FILE = 'config.json'
-MODLOGS_FILE = 'modlogs.json'
+MODSTATS_FILE = 'modstats.json'
 
 try: # load blacklisted users from json
     with open(BLACKLIST_FILE, 'r') as f:
@@ -32,10 +32,10 @@ except FileNotFoundError:
     config_file = []
 
 try:
-    with open(MODLOGS_FILE, 'r') as f:
-        modlogs_file = json.load(f)
+    with open(MODSTATS_FILE, 'r') as f:
+        modstats_file = json.load(f)
 except FileNotFoundError:
-    modlogs_file = dict()
+    modstats_file = dict()
 
 GUILD_ID = discord.Object(id=guild)
 PENDING_CHANNEL_ID = config_file[0] # loading configs
@@ -262,14 +262,14 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
             print(e)
         await message.delete()
 
-    if str(ctx.member.id) not in modlogs_file:
-        modlogs_file[str(ctx.member.id)] = 1
+    if str(ctx.member.id) not in modstats_file:
+        modstats_file[str(ctx.member.id)] = 1
     else:
-        modlogs_file.update({str(ctx.member.id): modlogs_file.get(str(ctx.member.id)) + 1})
+        modstats_file.update({str(ctx.member.id): modstats_file.get(str(ctx.member.id)) + 1})
 
     try:
-        with open(MODLOGS_FILE, 'w') as f:
-            json.dump(modlogs_file, f, indent=4)
+        with open(MODSTATS_FILE, 'w') as f:
+            json.dump(modstats_file, f, indent=4)
     except Exception as e:
         print(e)
     
@@ -439,8 +439,8 @@ async def modstats(ctx: discord.Interaction, staff: Optional[discord.Member] = N
     if staff is None:
         staff = ctx.user
 
-    if str(staff.id) in modlogs_file:
-        await ctx.response.send_message(f'{staff} has {modlogs_file.get(str(staff.id))} moderations', ephemeral=EPHEMERAL)
+    if str(staff.id) in modstats_file:
+        await ctx.response.send_message(f'{staff} has {modstats_file.get(str(staff.id))} moderations', ephemeral=EPHEMERAL)
     else:
         await ctx.response.send_message(f'{staff} has no moderations', ephemeral=EPHEMERAL)
 
@@ -453,13 +453,13 @@ async def modstats(ctx: discord.Interaction, staff: Optional[discord.Member] = N
     numlogs='number of logs'
 )
 async def setmodstats(ctx: discord.Interaction, staff: discord.Member, numlogs: int):
-    modlogs_file.update({str(staff.id): numlogs})
+    modstats_file.update({str(staff.id): numlogs})
 
     await ctx.response.send_message(f'{staff} modstats set to {numlogs}', ephemeral=EPHEMERAL)
 
     try:
-        with open(MODLOGS_FILE, 'w') as f:
-            json.dump(modlogs_file, f, indent=4)
+        with open(MODSTATS_FILE, 'w') as f:
+            json.dump(modstats_file, f, indent=4)
     except Exception as e:
         print(e)
 
@@ -467,12 +467,12 @@ async def setmodstats(ctx: discord.Interaction, staff: discord.Member, numlogs: 
 
 @bot.tree.command(name='listmodstats', description='List all user modstats in descending order', guild=GUILD_ID)
 async def listmodstats(ctx: discord.Interaction):
-    sortedModlogs = sorted(modlogs_file.items(), key=lambda item: item[1], reverse=True)
+    sortedModlogs = sorted(modstats_file.items(), key=lambda item: item[1], reverse=True)
     
-    modlogsString = ''.join(f"<@{k}>: {v}\n" for k, v in sortedModlogs)
+    modstatsString = ''.join(f"<@{k}>: {v}\n" for k, v in sortedModlogs)
     embed = discord.Embed()
     embed.add_field(name='Modstats list',
-                    value=modlogsString,
+                    value=modstatsString,
                     inline=False)
     
     await ctx.response.send_message(embed=embed)
