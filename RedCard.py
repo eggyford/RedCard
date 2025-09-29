@@ -61,10 +61,18 @@ bot = commands.Bot(command_prefix='$', intents=intents)
 @app_commands.describe(
     name='Roblox username.',
     link='Link video evidence.',
-    attachment='Attach video evidence.'
+    attachment='Attach video evidence.',
+    description='Type of report being submitted'
 )
 @app_commands.checks.cooldown(COMMAND_RATE_LIMIT, COMMAND_COOLDOWN, key=lambda i: i.user.id)
-async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None, attachment: Optional[discord.Attachment] = None):
+@app_commands.choices(description=[
+    app_commands.Choice(name='Aimbot', value='Aimbot'),
+    app_commands.Choice(name='Flying', value='Flying'),
+    app_commands.Choice(name='Esp', value='Esp'),
+    app_commands.Choice(name='Shooting through walls', value='Wallbang'),
+    app_commands.Choice(name='Other', value='Other')
+])
+async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None, attachment: Optional[discord.Attachment] = None, description: app_commands.Choice[str] = None):
     if ctx.user.id in blacklisted_users: # stop if user blacklisted
         await ctx.response.send_message('You have been blacklisted from making reports.', ephemeral=EPHEMERAL)
         
@@ -104,14 +112,15 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
     
     embed.set_thumbnail(url=thumbnails[random.randint(0,len(thumbnails)-1)]) # grab a random thumbnail from the list to put in embed
 
-    if link is not None: # add a field, depends on if user submitted a link
-        embed.add_field(name='',
-                        value=f'❯ Reported by: {ctx.user.mention}\n❯ {link}',
-                        inline=False)
-    else:
-        embed.add_field(name='',
-                        value=f'❯ Reported by: {ctx.user.mention}',
-                        inline=False)
+    embedMessage = f'❯ Reported by: {ctx.user.mention}'
+    if link is not None:
+        embedMessage += f'\n❯ Link: {link}'
+    if description is not None:
+        embedMessage += f'\n❯ Description: {description.value}'
+
+    embed.add_field(name='',
+                    value=embedMessage,
+                    inline=False)
     
     embed.set_footer(text=f'{ctx.user.id}', # redcard png as the footer icon
                     icon_url="https://cdn-icons-png.flaticon.com/32/5524/5524644.png")
@@ -340,61 +349,34 @@ async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.Text
         global PENDING_CHANNEL_ID
         PENDING_CHANNEL_ID = pendingchannel.id
 
-        try:
-            with open(CONFIG_FILE, 'w') as f:
-                config_file[0] = pendingchannel.id
-                json.dump(config_file, f)
-        except FileNotFoundError as e:
-            print(f'Unfuck this bruh: {e}')
-            return
-
     if logschannel is not None:
         global LOGS_CHANNEL_ID
         LOGS_CHANNEL_ID = logschannel.id
 
-        try:
-            with open(CONFIG_FILE, 'w') as f:
-                config_file[1] = logschannel.id
-                json.dump(config_file, f)
-        except FileNotFoundError as e:
-            print(f'Unfuck this bruh: {e}')
-            return
-        
     if maxfilesize is not None:
         global MAX_FILE_SIZE
         MAX_FILE_SIZE = maxfilesize
 
-        try:
-            with open(CONFIG_FILE, 'w') as f:
-                config_file[2] = maxfilesize
-                json.dump(config_file, f)
-        except FileNotFoundError as e:
-            print(f'Unfuck this bruh: {e}')
-            return
-    
     if cooldown is not None:
         global COMMAND_COOLDOWN
         COMMAND_COOLDOWN = cooldown
-
-        try:
-            with open(CONFIG_FILE, 'w') as f:
-                config_file[3] = cooldown
-                json.dump(config_file, f)
-        except FileNotFoundError as e:
-            print(f'Unfuck this bruh: {e}')
-            return
         
     if ratelimit is not None:
         global COMMAND_RATE_LIMIT
         COMMAND_RATE_LIMIT = ratelimit
 
-        try:
-            with open(CONFIG_FILE, 'w') as f:
-                config_file[4] = ratelimit
-                json.dump(config_file, f)
-        except FileNotFoundError as e:
-            print(f'Unfuck this bruh: {e}')
-            return
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            config_file[0] = PENDING_CHANNEL_ID
+            config_file[1] = LOGS_CHANNEL_ID
+            config_file[2] = MAX_FILE_SIZE
+            config_file[3] = COMMAND_COOLDOWN
+            config_file[4] = COMMAND_RATE_LIMIT
+            json.dump(config_file, f)
+    except FileNotFoundError as e:
+        print(f'Unfuck this bruh: {e}')
+        return
+        
     await ctx.response.send_message('Configured.', ephemeral=EPHEMERAL)
 
     del ctx
@@ -424,7 +406,7 @@ async def viewconfig(ctx: discord.Interaction):
     gc.collect()
     return
 
-# --------------------------------- STAFF PINGS ---------------------------------
+    # --------------------------------- STAFF PINGS ---------------------------------
 
 @bot.tree.command(name='active', description='Toggle report pings', guild=GUILD_ID)
 async def active(ctx: discord.Interaction):
@@ -447,7 +429,7 @@ async def active(ctx: discord.Interaction):
 
     return
 
-# --------------------------------- MOD STATS ---------------------------------
+    # --------------------------------- MOD STATS ---------------------------------
 
 @bot.tree.command(name='modstats', description='Get completed reports of staff', guild=GUILD_ID)
 @app_commands.describe(
@@ -497,7 +479,7 @@ async def listmodstats(ctx: discord.Interaction):
     
     return
 
-# --------------------------------- OVERWRITE ---------------------------------
+    # --------------------------------- OVERWRITE ---------------------------------
 
 @bot.tree.command(name='overwrite', description='Overwrite a report', guild=GUILD_ID)
 @app_commands.describe(
