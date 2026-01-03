@@ -53,6 +53,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='$', intents=intents)
 
+
 # -------------------------------- BOT FUNCTION -------------------------------
 
     # -------------------------------- REPORT --------------------------------
@@ -62,7 +63,7 @@ bot = commands.Bot(command_prefix='$', intents=intents)
     name='Roblox username.',
     link='Link video evidence.',
     attachment='Attach video evidence.',
-    description='Type of report being submitted'
+    description='Type of report being submitted.'
 )
 @app_commands.checks.cooldown(COMMAND_RATE_LIMIT, COMMAND_COOLDOWN, key=lambda i: i.user.id)
 @app_commands.choices(description=[
@@ -156,13 +157,13 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     channel = bot.get_channel(ctx.channel_id) # channel message reacted in (this fires for ALL reactions. needed for filter)
     message = await channel.fetch_message(ctx.message_id) # message reacted to
 
-    if ctx.channel_id != PENDING_CHANNEL_ID:
+    if ctx.channel_id != PENDING_CHANNEL_ID: # check message being reacted to is in the pending channel 
         return
     
-    if ctx.user_id == bot.user.id:
+    if ctx.user_id == bot.user.id: # check if message from bot
         return
 
-    if message.author.id != bot.user.id:
+    if message.author.id != bot.user.id: # pass over the bot self-reacting during the message creation
         return
     
     member = await bot.fetch_user(message.embeds[0].footer.text) # gets user who made report from footer of embed 
@@ -171,7 +172,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
         logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
         moderator = await bot.fetch_user(ctx.user_id)
 
-        embedToSend = discord.Embed()
+        embedToSend = discord.Embed() # Probably could make this look better but I cba
         embedToSend.title = f'Report Accepted: {message.embeds[0].title[17:]}'
         embedToSend.color = 0x44ff44
         embedToSend.set_thumbnail(url = message.embeds[0].thumbnail.url)
@@ -268,7 +269,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
         modstats_file.update({str(ctx.member.id): modstats_file.get(str(ctx.member.id)) + 1})
 
     try:
-        with open(MODSTATS_FILE, 'w') as f:
+        with open(MODSTATS_FILE, 'w') as f: # update modstats json
             json.dump(modstats_file, f, indent=4)
     except Exception as e:
         print(e)
@@ -284,7 +285,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     user='User to blacklist.'
 )
 async def blacklist(ctx:discord.Interaction, user: discord.Member):
-    if not ctx.user.guild_permissions.kick_members:
+    if not ctx.user.guild_permissions.kick_members: # only mods can run this
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
 
         del ctx
@@ -293,7 +294,7 @@ async def blacklist(ctx:discord.Interaction, user: discord.Member):
 
     if user.id not in blacklisted_users:
         blacklisted_users.append(user.id)
-        with open(BLACKLIST_FILE, 'w') as f:
+        with open(BLACKLIST_FILE, 'w') as f: # write to blacklist json
             json.dump(blacklisted_users, f)
         await ctx.response.send_message(f'{user.mention} has been blacklisted.', ephemeral=EPHEMERAL)
     else:
@@ -308,7 +309,7 @@ async def blacklist(ctx:discord.Interaction, user: discord.Member):
     user='User to unblacklist.'
 )
 async def unblacklist(ctx:discord.Interaction, user: discord.Member):
-    if not ctx.user.guild_permissions.kick_members:
+    if not ctx.user.guild_permissions.kick_members: # only mods can run this
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
         
         del ctx
@@ -317,7 +318,7 @@ async def unblacklist(ctx:discord.Interaction, user: discord.Member):
 
     if user.id in blacklisted_users:
         blacklisted_users.remove(user.id)
-        with open(BLACKLIST_FILE, 'w') as f:
+        with open(BLACKLIST_FILE, 'w') as f: # write to blacklist json
             json.dump(blacklisted_users, f)
         await ctx.response.send_message(f'{user.mention} has been unblacklisted.', ephemeral=EPHEMERAL)
     else:
@@ -345,6 +346,7 @@ async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.Text
         gc.collect()
         return
     
+    # update globals
     if pendingchannel is not None:
         global PENDING_CHANNEL_ID
         PENDING_CHANNEL_ID = pendingchannel.id
@@ -366,7 +368,7 @@ async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.Text
         COMMAND_RATE_LIMIT = ratelimit
 
     try:
-        with open(CONFIG_FILE, 'w') as f:
+        with open(CONFIG_FILE, 'w') as f: # write to config json
             config_file[0] = PENDING_CHANNEL_ID
             config_file[1] = LOGS_CHANNEL_ID
             config_file[2] = MAX_FILE_SIZE
@@ -467,9 +469,9 @@ async def setmodstats(ctx: discord.Interaction, staff: discord.Member, numlogs: 
 
 @bot.tree.command(name='listmodstats', description='List all user modstats in descending order', guild=GUILD_ID)
 async def listmodstats(ctx: discord.Interaction):
-    sortedModlogs = sorted(modstats_file.items(), key=lambda item: item[1], reverse=True)
+    sortedModstats = sorted(modstats_file.items(), key=lambda item: item[1], reverse=True)
     
-    modstatsString = ''.join(f"<@{k}>: {v}\n" for k, v in sortedModlogs)
+    modstatsString = ''.join(f"<@{k}>: {v}\n" for k, v in sortedModstats)
     embed = discord.Embed()
     embed.add_field(name='Modstats list',
                     value=modstatsString,
@@ -524,7 +526,11 @@ async def overwrite(ctx: discord.Interaction, reportid: str):
             await ctx.response.send_message(f'Uhh something broke screenshot this and send to FreakyFentFold. \n{reportid}')
             return
 
-        await ctx.response.send_message(embed=newEmbed)
+        if message.attachments[0] is not None:
+            file = await message.attachments[0].to_file()
+            await ctx.response.send_message(embed=newEmbed, file=file) 
+        else:
+            await ctx.response.send_message(embed=newEmbed)
         await message.delete()
 
     except discord.errors.NotFound:
