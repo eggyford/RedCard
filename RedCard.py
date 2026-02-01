@@ -166,10 +166,10 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     if ctx.channel_id != PENDING_CHANNEL_ID: # check message being reacted to is in the pending channel 
         return
     
-    if ctx.user_id == bot.user.id: # check if message from bot
+    if ctx.user_id == bot.user.id: # pass over the bot self-reacting during the message creation
         return
 
-    if message.author.id != bot.user.id: # pass over the bot self-reacting during the message creation
+    if message.author.id != bot.user.id: # check if message from bot
         return
     
     member = await bot.fetch_user(message.embeds[0].footer.text) # gets user who made report from footer of embed 
@@ -532,11 +532,12 @@ async def overwrite(ctx: discord.Interaction, reportid: str):
             await ctx.response.send_message(f'Uhh something broke screenshot this and send to FreakyFentFold. \n{reportid}')
             return
 
-        if message.attachments[0] is not None:
+        try:
             file = await message.attachments[0].to_file()
             await ctx.response.send_message(embed=newEmbed, file=file) 
-        else:
+        except:
             await ctx.response.send_message(embed=newEmbed)
+
         await message.delete()
 
     except discord.errors.NotFound:
