@@ -117,8 +117,8 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
                   'https://media.discordapp.net/attachments/1418045419472289931/1455661632532385833/image.gif?ex=6966ad8a&is=69655c0a&hm=1c3a8ce575dde6f0c9b6f5aacb4f9f407c5b459b43aab4f87b49cd0fc980c27d&=&format=webp&quality=lossless&width=750&height=750',
                   'https://media.discordapp.net/attachments/1279324733313384522/1456927739830472805/attachment.gif?ex=6966ab71&is=696559f1&hm=dafc96ed4ac09f2fb7cab737c47e780467ae5da12f4c38f069487663264a0d46&=&format=webp&quality=lossless&width=750&height=750']    
     
-    embed.set_thumbnail(url=thumbnails[random.randint(0,len(thumbnails)-1)]) # grab a random thumbnail from the list to put in embed
-
+    embed.set_thumbnail(url=random.choice(thumbnails))
+    
     embedMessage = f'❯ Reported by: {ctx.user.mention}'
     if link is not None:
         embedMessage += f'\n❯ Link: {link}'
