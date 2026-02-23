@@ -13,38 +13,33 @@ load_dotenv()
 
 token = os.getenv('DISCORD_TOKEN')
 guild = os.getenv('ID')
-EPHEMERAL = True # Set this false if u wanna debug easier
+GUILD_ID = discord.Object(id=guild) # set to None to make updates global
+EPHEMERAL = False # Set this false if u wanna debug easier
 BLACKLIST_FILE = 'blacklist.json'
 CONFIG_FILE = 'config.json'
 MODSTATS_FILE = 'modstats.json'
 
 try: # load blacklisted users from json
     with open(BLACKLIST_FILE, 'r') as f:
-        blacklisted_users = json.load(f)
+        blacklist_file = json.load(f)
 except FileNotFoundError:
-    blacklisted_users = []
+    blacklist_file = {}
 
 try: # load server config from json
     with open(CONFIG_FILE, 'r') as f:
         config_file = json.load(f)
 except FileNotFoundError:
     print('set up /config')
-    config_file = []
+    config_file = {}
 
 try:
     with open(MODSTATS_FILE, 'r') as f:
         modstats_file = json.load(f)
 except FileNotFoundError:
-    modstats_file = dict()
+    modstats_file = {}
 
-GUILD_ID = discord.Object(id=guild)
-PENDING_CHANNEL_ID = config_file[0] # loading configs
-LOGS_CHANNEL_ID = config_file[1]
-MAX_FILE_SIZE = config_file[2]
-COMMAND_COOLDOWN = config_file[3]
-COMMAND_RATE_LIMIT = config_file[4]
-for config in config_file:
-    print(config)
+# for config in config_file:
+#     print(config)
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
@@ -56,6 +51,10 @@ bot = commands.Bot(command_prefix='$', intents=intents)
 
 # -------------------------------- BOT FUNCTION -------------------------------
 
+def getcooldown(ctx: discord.Interaction):
+    return app_commands.Cooldown(per=config_file[str(ctx.guild_id)]['cooldown'],
+                                 rate=config_file[str(ctx.guild_id)]['rateLimit'])
+
     # -------------------------------- REPORT --------------------------------
 
 @bot.tree.command(name='report', description='Report someone', guild=GUILD_ID)
@@ -65,7 +64,8 @@ bot = commands.Bot(command_prefix='$', intents=intents)
     attachment='Attach video evidence.',
     description='Type of report being submitted.'
 )
-@app_commands.checks.cooldown(COMMAND_RATE_LIMIT, COMMAND_COOLDOWN, key=lambda i: i.user.id)
+@app_commands.checks.dynamic_cooldown(getcooldown, 
+                                      key=lambda i: i.user.id)
 @app_commands.choices(description=[
     app_commands.Choice(name='Aimbot', value='Aimbot'),
     app_commands.Choice(name='Flying', value='Flying'),
@@ -74,7 +74,8 @@ bot = commands.Bot(command_prefix='$', intents=intents)
     app_commands.Choice(name='Other', value='Other')
 ])
 async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None, attachment: Optional[discord.Attachment] = None, description: app_commands.Choice[str] = None):
-    if ctx.user.id in blacklisted_users: # stop if user blacklisted
+    print(f'Report called from {ctx.guild.id}')
+    if ctx.user.id in blacklist_file[str(ctx.guild_id)]: # stop if user blacklisted
         await ctx.response.send_message('You have been blacklisted from making reports.', ephemeral=EPHEMERAL)
         
         del ctx
@@ -83,15 +84,15 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
         
     if attachment is not None:
         attachmentSizeMB = attachment.size / 1024 / 1024
-        if attachmentSizeMB >= MAX_FILE_SIZE: # stop if uploaded file bigger than upload limit
-            await ctx.response.send_message(content=f'File size limit is {MAX_FILE_SIZE}MB.\nTry uploading to https://www.youtu.be and sending the link instead.', ephemeral=EPHEMERAL)
+        if attachmentSizeMB >= config_file[str(ctx.guild_id)]['maxFileSize']: # stop if uploaded file bigger than upload limit
+            await ctx.response.send_message(content=f'File size limit is {config_file[str(ctx.guild_id)]['maxFileSize']}MB.\nTry uploading to https://www.youtu.be and sending the link instead.', ephemeral=EPHEMERAL)
             
             del ctx, attachment
             gc.collect()
             return
 
     guild = ctx.guild
-    pendingChannel = guild.get_channel(PENDING_CHANNEL_ID)
+    pendingChannel = guild.get_channel(config_file[str(ctx.guild_id)]['pendingChannel'])
     rolePing = discord.utils.get(ctx.guild.roles, name='reportPings')
 
     if link is None and attachment is None: # stop if no evidence included in report
@@ -130,7 +131,7 @@ async def report(ctx: discord.Interaction, name: str, link: Optional[str] = None
                     inline=False)
     
     embed.set_footer(text=f'{ctx.user.id}', # redcard png as the footer icon
-                    icon_url="https://cdn-icons-png.flaticon.com/32/5524/5524644.png")
+                    icon_url='https://cdn-icons-png.flaticon.com/32/5524/5524644.png')
 
     if attachment is not None:
         pendingReport = await pendingChannel.send(f'<@&{rolePing.id}>', embed=embed, file=await attachment.to_file()) # send report to pending channel, depends on if file attached
@@ -163,7 +164,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     channel = bot.get_channel(ctx.channel_id) # channel message reacted in (this fires for ALL reactions. needed for filter)
     message = await channel.fetch_message(ctx.message_id) # message reacted to
 
-    if ctx.channel_id != PENDING_CHANNEL_ID: # check message being reacted to is in the pending channel 
+    if ctx.channel_id != config_file[str(ctx.guild_id)]['pendingChannel']: # check message being reacted to is in the pending channel 
         return
     
     if ctx.user_id == bot.user.id: # pass over the bot self-reacting during the message creation
@@ -175,7 +176,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     member = await bot.fetch_user(message.embeds[0].footer.text) # gets user who made report from footer of embed 
 
     if react == '✅': # accept report
-        logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
+        logsChannel = await bot.fetch_channel(config_file[str(ctx.guild_id)]['logChannel'])
         moderator = await bot.fetch_user(ctx.user_id)
 
         embedToSend = discord.Embed() # Probably could make this look better but I cba
@@ -206,7 +207,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
         await message.delete()
 
     if react == '❌': # deny report
-        logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
+        logsChannel = await bot.fetch_channel(config_file[str(ctx.guild_id)]['logChannel'])
         moderator = await bot.fetch_user(ctx.user_id)
 
         embedToSend = discord.Embed()
@@ -237,14 +238,14 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
         await message.delete()
     
     if react == '🛃': # blacklist user from making reports
-        logsChannel = await bot.fetch_channel(LOGS_CHANNEL_ID)
+        logsChannel = await bot.fetch_channel(config_file[str(ctx.guild_id)]['logChannel'])
         user = await bot.fetch_user(message.embeds[0].footer.text)
         moderator = await bot.fetch_user(ctx.user_id)
         
-        if user.id not in blacklisted_users:
+        if user.id not in blacklist_file[str(ctx.guild_id)]:
             with open(BLACKLIST_FILE, 'w') as f:
-                blacklisted_users.append(user.id)
-                json.dump(blacklisted_users, f)
+                blacklist_file[str(ctx.guild_id)].append(user.id)
+                json.dump(blacklist_file, f, indent=4)
 
         embedToSend = discord.Embed()
         embedToSend.title = f'Blacklisted'
@@ -269,10 +270,9 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
             print(e)
         await message.delete()
 
-    if str(ctx.member.id) not in modstats_file:
-        modstats_file[str(ctx.member.id)] = 1
-    else:
-        modstats_file.update({str(ctx.member.id): modstats_file.get(str(ctx.member.id)) + 1})
+    if str(ctx.member.id) not in modstats_file[str(ctx.guild_id)]:
+        modstats_file[str(ctx.guild_id)][str(ctx.member.id)] = 0
+    modstats_file[str(ctx.guild_id)][str(ctx.member.id)] += 1
 
     try:
         with open(MODSTATS_FILE, 'w') as f: # update modstats json
@@ -291,6 +291,7 @@ async def on_raw_reaction_add(ctx: discord.RawReactionActionEvent):
     user='User to blacklist.'
 )
 async def blacklist(ctx:discord.Interaction, user: discord.Member):
+    print(f'Blacklist called from {ctx.guild.id}')
     if not ctx.user.guild_permissions.kick_members: # only mods can run this
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
 
@@ -298,10 +299,10 @@ async def blacklist(ctx:discord.Interaction, user: discord.Member):
         gc.collect()
         return
 
-    if user.id not in blacklisted_users:
-        blacklisted_users.append(user.id)
+    if user.id not in blacklist_file:
+        blacklist_file[str(ctx.guild_id)].append(user.id)
         with open(BLACKLIST_FILE, 'w') as f: # write to blacklist json
-            json.dump(blacklisted_users, f)
+            json.dump(blacklist_file, f, indent=4)
         await ctx.response.send_message(f'{user.mention} has been blacklisted.', ephemeral=EPHEMERAL)
     else:
         await ctx.response.send_message(f'{user.mention} is already blacklisted.', ephemeral=EPHEMERAL)
@@ -315,6 +316,7 @@ async def blacklist(ctx:discord.Interaction, user: discord.Member):
     user='User to unblacklist.'
 )
 async def unblacklist(ctx:discord.Interaction, user: discord.Member):
+    print(f'Unblacklist called from {ctx.guild.id}')
     if not ctx.user.guild_permissions.kick_members: # only mods can run this
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
         
@@ -322,10 +324,10 @@ async def unblacklist(ctx:discord.Interaction, user: discord.Member):
         gc.collect()
         return
 
-    if user.id in blacklisted_users:
-        blacklisted_users.remove(user.id)
+    if user.id in blacklist_file[str(ctx.guild_id)]:
+        blacklist_file[str(ctx.guild_id)].remove(user.id)
         with open(BLACKLIST_FILE, 'w') as f: # write to blacklist json
-            json.dump(blacklisted_users, f)
+            json.dump(blacklist_file, f, indent=4)
         await ctx.response.send_message(f'{user.mention} has been unblacklisted.', ephemeral=EPHEMERAL)
     else:
         await ctx.response.send_message(f'{user.mention} is not blacklisted.', ephemeral=EPHEMERAL)
@@ -339,12 +341,13 @@ async def unblacklist(ctx:discord.Interaction, user: discord.Member):
 @bot.tree.command(name='config', description='Configure channel IDs', guild=GUILD_ID)
 @app_commands.describe(
     pendingchannel='Set Pending Channel',
-    logschannel='Set Logs Channel',
+    logchannel='Set Log Channel',
     maxfilesize='Set Max File Size (MB)',
     cooldown='Set Report Command Cooldown (Seconds)',
     ratelimit='Set how many reports can be sent before cooldown'
 )
-async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.TextChannel] = None, logschannel: Optional[discord.TextChannel] = None, maxfilesize: Optional[int] = None, cooldown: Optional[int] = None, ratelimit: Optional[int] = None):
+async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.TextChannel] = None, logchannel: Optional[discord.TextChannel] = None, maxfilesize: Optional[int] = None, cooldown: Optional[int] = None, ratelimit: Optional[int] = None):
+    print(f'Config called from {ctx.guild.id}')
     if not ctx.user.guild_permissions.administrator:
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
         
@@ -352,39 +355,45 @@ async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.Text
         gc.collect()
         return
     
-    # update globals
-    if pendingchannel is not None:
-        global PENDING_CHANNEL_ID
-        PENDING_CHANNEL_ID = pendingchannel.id
+    if not discord.utils.get(ctx.guild.roles, name='reportPings'):
+        await ctx.guild.create_role(reason='Config', name='reportPings')
+    
+    if str(ctx.guild_id) not in config_file:
+        config_file[str(ctx.guild_id)] = {'pendingChannel': None, 
+                                          'logChannel': None, 
+                                          'maxFileSize': 0, 
+                                          'cooldown': 0, 
+                                          'rateLimit': 0}
+    if str(ctx.guild.id) not in blacklist_file:
+        blacklist_file[str(ctx.guild.id)] = []
+    if str(ctx.guild.id) not in modstats_file:
+        modstats_file[str(ctx.guild.id)] = {}
 
-    if logschannel is not None:
-        global LOGS_CHANNEL_ID
-        LOGS_CHANNEL_ID = logschannel.id
-
-    if maxfilesize is not None:
-        global MAX_FILE_SIZE
-        MAX_FILE_SIZE = maxfilesize
-
-    if cooldown is not None:
-        global COMMAND_COOLDOWN
-        COMMAND_COOLDOWN = cooldown
-        
-    if ratelimit is not None:
-        global COMMAND_RATE_LIMIT
-        COMMAND_RATE_LIMIT = ratelimit
 
     try:
         with open(CONFIG_FILE, 'w') as f: # write to config json
-            config_file[0] = PENDING_CHANNEL_ID
-            config_file[1] = LOGS_CHANNEL_ID
-            config_file[2] = MAX_FILE_SIZE
-            config_file[3] = COMMAND_COOLDOWN
-            config_file[4] = COMMAND_RATE_LIMIT
-            json.dump(config_file, f)
+            config_file[str(ctx.guild_id)]['pendingChannel'] =  config_file[str(ctx.guild_id)]['pendingChannel']    if pendingchannel is None else pendingchannel.id
+            config_file[str(ctx.guild_id)]['logChannel'] =      config_file[str(ctx.guild_id)]['logChannel']        if logchannel is None else logchannel.id
+            config_file[str(ctx.guild_id)]['maxFileSize'] =     config_file[str(ctx.guild_id)]['maxFileSize']       if maxfilesize is None else maxfilesize
+            config_file[str(ctx.guild_id)]['cooldown'] =        config_file[str(ctx.guild_id)]['cooldown']          if cooldown is None else cooldown
+            config_file[str(ctx.guild_id)]['rateLimit'] =       config_file[str(ctx.guild_id)]['rateLimit']         if ratelimit is None else ratelimit
+            json.dump(config_file, f, indent=4)
     except FileNotFoundError as e:
         print(f'Unfuck this bruh: {e}')
         return
-        
+    
+    try:
+        with open(BLACKLIST_FILE, 'w') as f:
+            json.dump(blacklist_file, f, indent=4)
+    except FileNotFoundError as e:
+        print(f'Unfuck this bruh: {e}')
+
+    try:
+        with open(MODSTATS_FILE, 'w') as f:
+            json.dump(modstats_file, f, indent=4)
+    except FileNotFoundError as e:
+        print(f'Unfuck this bruh: {e}')
+            
     await ctx.response.send_message('Configured.', ephemeral=EPHEMERAL)
 
     del ctx
@@ -393,6 +402,7 @@ async def config(ctx: discord.Interaction, pendingchannel: Optional[discord.Text
 
 @bot.tree.command(name='viewconfig', description='View what channels are being used by RedCard', guild=GUILD_ID)
 async def viewconfig(ctx: discord.Interaction):
+    print(f'Viewconfig called from {ctx.guild.id}')
     if not ctx.user.guild_permissions.administrator:
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
         
@@ -400,11 +410,24 @@ async def viewconfig(ctx: discord.Interaction):
         gc.collect()
         return
     
+    if str(ctx.guild.id) not in config_file:
+        await ctx.response.send_message('Set up /config', ephemeral=EPHEMERAL)
+
+        del ctx
+        gc.collect()
+        return
+    
     guild = ctx.guild
+    pendingChannel =    guild.get_channel(config_file[str(ctx.guild_id)]['pendingChannel']).jump_url    if guild.get_channel(config_file[str(ctx.guild_id)]['pendingChannel']) is not None else None # check if valid
+    logChannel =        guild.get_channel(config_file[str(ctx.guild_id)]['logChannel']).jump_url        if guild.get_channel(config_file[str(ctx.guild_id)]['logChannel']) is not None else None # check if valid
+    maxFileSize =       config_file[str(ctx.guild_id)]['maxFileSize']
+    cooldown =          config_file[str(ctx.guild_id)]['cooldown']
+    rateLimit =         config_file[str(ctx.guild_id)]['rateLimit']
+
     try:
         embed = discord.Embed()
         embed.add_field(name='',
-                        value=f'Pending channel: {guild.get_channel(PENDING_CHANNEL_ID).jump_url}\nLog channel: {guild.get_channel(LOGS_CHANNEL_ID).jump_url}\nMax file size: {MAX_FILE_SIZE}MB\nCooldown: {COMMAND_COOLDOWN} seconds\nRate Limit: {COMMAND_RATE_LIMIT}',
+                        value=f'Pending channel: {pendingChannel}\nLog channel: {logChannel}\nMax file size: {maxFileSize}MB\nCooldown: {cooldown} seconds\nRate Limit: {rateLimit}',
                         inline = False)
         await ctx.response.send_message(embed=embed, ephemeral=EPHEMERAL)
     except Exception as e:
@@ -418,6 +441,7 @@ async def viewconfig(ctx: discord.Interaction):
 
 @bot.tree.command(name='active', description='Toggle report pings', guild=GUILD_ID)
 async def active(ctx: discord.Interaction):
+    print(f'Active called from {ctx.guild.id}')
     if not ctx.user.guild_permissions.kick_members:
         await ctx.response.send_message('No perms twuzzo', ephemeral=EPHEMERAL)
         return
@@ -444,11 +468,12 @@ async def active(ctx: discord.Interaction):
     staff='staff id'
 )
 async def modstats(ctx: discord.Interaction, staff: Optional[discord.Member] = None):
+    print(f'Modstats called from {ctx.guild.id}')
     if staff is None:
         staff = ctx.user
 
-    if str(staff.id) in modstats_file:
-        await ctx.response.send_message(f'{staff} has {modstats_file.get(str(staff.id))} moderations', ephemeral=EPHEMERAL)
+    if str(staff.id) in modstats_file[str(ctx.guild_id)]:
+        await ctx.response.send_message(f'{staff} has {modstats_file[str(ctx.guild_id)][str(staff.id)]} moderations', ephemeral=EPHEMERAL)
     else:
         await ctx.response.send_message(f'{staff} has no moderations', ephemeral=EPHEMERAL)
 
@@ -461,7 +486,8 @@ async def modstats(ctx: discord.Interaction, staff: Optional[discord.Member] = N
     numlogs='number of logs'
 )
 async def setmodstats(ctx: discord.Interaction, staff: discord.Member, numlogs: int):
-    modstats_file.update({str(staff.id): numlogs})
+    print(f'Setmodstats called from {ctx.guild.id}')
+    modstats_file[str(ctx.guild_id)][str(staff.id)] = numlogs
 
     await ctx.response.send_message(f'{staff} modstats set to {numlogs}', ephemeral=EPHEMERAL)
 
@@ -475,9 +501,10 @@ async def setmodstats(ctx: discord.Interaction, staff: discord.Member, numlogs: 
 
 @bot.tree.command(name='listmodstats', description='List all user modstats in descending order', guild=GUILD_ID)
 async def listmodstats(ctx: discord.Interaction):
-    sortedModstats = sorted(modstats_file.items(), key=lambda item: item[1], reverse=True)
+    print(f'Listmodstats called from {ctx.guild.id}')
+    sortedModstats = sorted(modstats_file[str(ctx.guild_id)].items(), key=lambda item: item[1], reverse=True)
     
-    modstatsString = ''.join(f"<@{k}>: {v}\n" for k, v in sortedModstats)
+    modstatsString = ''.join(f'<@{k}>: {v}\n' for k, v in sortedModstats)
     embed = discord.Embed()
     embed.add_field(name='Modstats list',
                     value=modstatsString,
@@ -494,9 +521,10 @@ async def listmodstats(ctx: discord.Interaction):
     reportid='message ID'
 )
 async def overwrite(ctx: discord.Interaction, reportid: str):
+    print(f'Overwrite called from {ctx.guild.id}')
     try:
         reportidAsInt = int(reportid)
-        channel = bot.get_channel(LOGS_CHANNEL_ID)
+        channel = bot.get_channel(config_file[str(ctx.guild_id)]['logChannel'])
         message = await channel.fetch_message(reportidAsInt)
 
         if message.author.id != bot.user.id:
@@ -563,5 +591,22 @@ async def on_ready():
 
     except Exception as e:
         print(f'Shit broke: {e}')
+
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    if str(guild.id) not in config_file:
+        config_file[str(guild.id)] = {
+            'pendingChannel': None,
+            'logChannel': None,
+            'maxFileSize': 0,
+            'cooldown': 0,
+            'rateLimit': 1
+        }
+    
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config_file, f, indent=4)
+    except FileNotFoundError as e:
+        print(f'Unfuck this shit bruh: {e}')
 
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
